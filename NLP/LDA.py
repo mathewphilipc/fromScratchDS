@@ -20,6 +20,10 @@
 # and the topic from which that word was chosen is
 # > document_topics[3][4]
 
+from collections import Counter
+import random
+random.seed( 10 )
+
 # Our documents are our users' interests:
 
 documents = [
@@ -41,3 +45,74 @@ documents = [
 ]
 
 # We'll try to find K = 4 topics
+K = 4
+
+# How many times each topic is assigned to each document
+# A list of Counters, one for each document
+document_topic_counts = [Counter() for _ in documents]
+
+# How many times each word is assigned to each topic
+# A list of Counters, one for each topic
+topic_word_counts = [Counter() for _ in range(K)]
+
+# The total number of words assigned to each topic:
+# A list of numbers, one for each topic
+topic_counts = [0 for _ in range(K)]
+
+# The total number of words contained in each document
+# A list of numbers, one for each document
+document_lengths = map(len, documents)
+
+# The number of distinct words
+distinct_words = set(word for document in documents for word in document)
+W = len(distinct_words)
+
+# Number of documents
+D = len(documents)
+
+def p_topic_given_document(topic, d, alpha=0.1):
+	"""the fraction of words in document _d_ that are assigned to
+	_topic_ (plus some smoothing controlled by alpha)"""
+	return ((document_topic_counts[d][topic] + alpha))/(document_lengths[d] + K*alpha)
+
+def p_word_given_topic(word, topic, beta=0.1):
+	"""the fraction of words assigned to _topic_ that equal _word_
+	(plus some smoothing controlled by beta)"""
+	return ((topic_word_counts[topic][word] + beta) / (topic_counts[topic] + W * beta))
+
+def topic_weight(d, word, k):
+	"""given a document and a word in that document,
+	return the weight for the kth topic"""
+	return p_word_given_topic(word, k) * p_topic_given_document(k,d)
+
+def choose_new_topic(d, word):
+	return random.sample([topic_weight(d, word, k) for k in range(K)])
+
+document_topics = [[random.randrange(K) for word in document] for document in documents]
+
+for d in range(D):
+	for word, topic in zip(documents[d], document_topics[d]):
+		document_topic_counts[d][topic] += 1
+		topic_word_counts[topic][word] += 1
+		topic_counts[topic] += 1
+
+for iter in range(1000):
+	for d in range(D):
+		for i, (word, topic) in enumerate(zip(documents[d], document_topics[d])):
+
+			# remove this word/topic from the counts so that it
+			# doesn't influence the weights
+			document_topic_counts[d][topic] -= 1
+			topic_word_counts[topic][word] -= 1
+			topic_counts[topic] -= 1
+			document_lengths[d] -= 1
+
+			# choose a new topic based on the weights
+			new_topic = choose_new_topic(d, word)
+			document_topics[d][i] = new_topic
+
+			# and now add it back to the counts
+			document_topic_counts[d][new_topic] += 1
+			topic_word_counts[new_topic][word] += 1
+			topic_counts[topic] += 1
+			document_lengths[d] += 1
